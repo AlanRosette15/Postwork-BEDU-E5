@@ -169,16 +169,186 @@ ggplot(dfT, aes(x = Var1, y = Var2, fill = Freq)) +
   scale_fill_gradient2(low = "Black", high = "Blue", mid = "Yellow") +
   theme_dark()
 
-#Postwork 4
-#Llamamos a nuestras 3 Estimaciones.
+#POSTWORK SESION 4 
+
+#Desarrollo
+#Ahora investigarás la dependencia o independencia del número de goles anotados por el equipo de casa
+#y el número de goles anotados por el equipo visitante mediante un procedimiento denominado bootstrap,
+#revisa bibliografía en internet para que tengas nociones de este desarrollo.
+
+#Ya hemos estimado las probabilidades conjuntas de que el equipo de casa anote X=x goles 
+#(x=0,1,... ,8), y el equipo visitante anote Y=y goles (y=0,1,... ,6), en un partido. Obtén una tabla 
+#de cocientes al dividir estas probabilidades conjuntas por el producto de las probabilidades 
+#marginales correspondientes.
+
+#Llamamos y renombramos a nuestras 3 variables.
 visitante <- FTAG1
 local <- FTHG1
 conjunta <- FTTG1
-conjunta
 
 cocientes <- apply(conjunta, 2, function(col) col/local)
 cocientes <- apply(cocientes, 1, function(fila) fila/visitante)
 cocientes <- t(cocientes)
-cocientes
+
+#Mediante un procedimiento de boostrap, obtén más cocientes similares a los obtenidos en la tabla del
+#punto anterior. Esto para tener una idea de las distribuciones de la cual vienen los cocientes en la
+#tabla anterior. Menciona en cuáles casos le parece razonable suponer que los cocientes de la tabla en
+#el punto 1, son iguales a 1 (en tal caso tendríamos independencia de las variables aleatorias X y Y).
+
+medias <- c()
+for(i in 1:10000){
+  set.seed(2*i)
+  medias[i] = mean(sample(cocientes, replace = TRUE))
+  
+}
+
+head(medias)
+
+library(ggplot2)
+
+ggplot() + 
+  geom_histogram(aes(medias), bins = 50) + 
+  geom_vline(aes(xintercept = mean(medias))) +
+  ggtitle("Histograma de distribución de medias muestrales")
+
+#Segun el Teorema Central del Limite, la media deberia ser igual a 1 para suponer que las variables
+#son independientes, y visualmente se oberva en el histograma que la media es inferior a 1. Por lo 
+#cual las variables X y Y no son independientes.
+
+#POSTWORK SESION 5
+
+#A partir del conjunto de datos de soccer de la liga española de las temporadas 2017/2018, 2018/2019 
+#y 2019/2020, crea el data frame SmallData, que contenga las columnas date, home.team, home.score, 
+#away.team y away.score; esto lo puedes hacer con ayuda de la función select del paquete dplyr. Luego
+#crea un directorio de trabajo y con ayuda de la función write.csv guarde el data frame como un archivo
+#csv con nombre soccer.csv. Puedes colocar como argumento row.names = FALSE en write.csv.
+
+library(dplyr)
+
+SP1<- read.csv("https://www.football-data.co.uk/mmz4281/1718/SP1.csv")
+SP2<- read.csv("https://www.football-data.co.uk/mmz4281/1819/SP1.csv")
+SP3<- read.csv("https://www.football-data.co.uk/mmz4281/1920/SP1.csv")
+
+SP1<- mutate(SP1, Date = as.Date(Date, "%d/%m/%y"))
+SP2<- mutate(SP2, Date = as.Date(Date, "%d/%m/%Y"))
+SP3<- mutate(SP3, Date = as.Date(Date, "%d/%m/%Y"))
+
+lista<-list(SP1,SP2,SP3)
+lista<- lapply(lista, select,Date, HomeTeam,FTHG,AwayTeam,FTAG,)
+str(lista)
+
+Data<- do.call(rbind,lista)
+SmallData <- select(Data, date = Date, home.team = HomeTeam, 
+               home.score = FTHG, away.team = AwayTeam, 
+               away.score = FTAG)
+
+
+head(SmallData)
+tail(SmallData)
+class(SmallData)
+
+write.csv(SmallData, file= "soccer.csv", row.names = FALSE)
+
+#Con la función create.fbRanks.dataframes del paquete fbRanks importa el archivo soccer.csv a R y al 
+#mismo tiempo asignarlo a una variable llamada listasoccer. Se creará una lista con los elementos scores
+#y teams que son data frames listos para la función rank.teams. Asigna estos data frames a variables 
+#llamadas anotaciones y equipos.
+
+install.packages("fbRanks")
+library(fbRanks)
+
+listasoccer <- create.fbRanks.dataframes(scores.file = "soccer.csv")
+anotaciones <- listasoccer$scores
+equipos <- listasoccer$teams
+
+
+#Con ayuda de la función unique crea un vector de fechas (fecha) que no se repitan y que correspondan a
+#las fechas en las que se jugaron partidos. Crea una variable llamada n que contenga el número de fechas
+#diferentes. Posteriormente, con la función rank.teams y usando como argumentos los data frames 
+#anotaciones y equipos, crea un ranking de equipos usando únicamente datos desde la fecha inicial y 
+#hasta la penúltima fecha en la que se jugaron partidos, estas fechas las deberá especificar en max.date
+#y min.date. Guarda los resultados con el nombre ranking.
+
+fecha <- unique(anotaciones$date)
+n <- length(fecha)
+ranking <- rank.teams(scores = anotaciones, teams = equipos,
+                      max.date = fecha[n-1],
+                      min.date = fecha[1])
+
+#Finalmente estima las probabilidades de los eventos, el equipo de casa gana, el equipo visitante gana
+#o el resultado es un empate para los partidos que se jugaron en la última fecha del vector de fechas
+#fecha. Esto lo puedes hacer con ayuda de la función predict y usando como argumentos ranking y fecha[n]
+#que deberá especificar en date.
+
+pred <- predict(ranking, date = fecha[n])
+
+#POSTWORK SESION 6
+
+#Desarrollo
+#Importe el conjunto de datos match.data.csv a R y realice lo siguiente:
+
+library(dplyr)
+data <- read.csv("match.data.csv")
+str(data)
+
+#Agrega una nueva columna sumagoles que contenga la suma de goles por partido.
+
+data1 <- data %>% 
+  mutate(date = as.Date(date, "%Y-%m-%d"),
+         sumagoles = home.score + away.score) 
+
+#Obtén el promedio por mes de la suma de goles.
+
+data1<- data1%>%
+  mutate(Mes = format(date, "%Y-%m")) %>%
+  group_by(Mes) %>%
+  summarise(promgoles = mean(sumagoles))
+
+class(data1)
+
+data1 <- as.data.frame(data1)
+
+
+#Crea la serie de tiempo del promedio por mes de la suma de goles hasta diciembre de 2019.
+
+data2 <- data1[1:96,]
+
+GolesPromedio <- ts(data2$promgoles, start = 1,
+                 frequency = 10)
+
+#Grafica la serie de tiempo.
+
+ts.plot(GolesPromedio)
+
+#POSTWORK SESION 7
+
+#Desarrollo
+#Utilizando el manejador de BDD Mongodb Compass (previamente instalado), deberás de realizar las 
+#siguientes acciones:
+
+install.packages("mongolite")
+library(mongolite)
+
+install.packages("data.table")
+library(data.table)
+  
+#Alojar el fichero data.csv en una base de datos llamada match_games, nombrando al collection como 
+#match
+
+match=data.table::fread("https://raw.githubusercontent.com/beduExpert/Programacion-con-R-Santander/master/Sesion-07/Postwork/data.csv")
+names(match)
+
+my_collection = mongo(collection = "match", db = "match_games") 
+my_collection$insert(match)  
+
+#Una vez hecho esto, realizar un count para conocer el número de registros que se tiene en la base
+
+#Realiza una consulta utilizando la sintaxis de Mongodb, en la base de datos para conocer el número de 
+#goles que metió el Real Madrid el 20 de diciembre de 2015 y contra qué equipo jugó, ¿perdió ó fue 
+#goleada?
+
+#Agrega el dataset de mtcars a la misma BDD
+
+#Por último, no olvides cerrar la conexión con la BDD.
 
 
